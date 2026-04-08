@@ -9,7 +9,12 @@ const { desktopApiMock, listenForShortcutEventsMock } = vi.hoisted(() => ({
     setAlwaysOnTop: vi.fn(),
     setWindowOpacity: vi.fn(),
     toggleMainWindow: vi.fn(),
+    openSettingsWindow: vi.fn(),
+    closeSettingsWindow: vi.fn(),
     registerGlobalShortcuts: vi.fn(),
+    getCurrentWindowKind: vi.fn(),
+    getAppInfo: vi.fn(),
+    listenForAppStateEvents: vi.fn(),
   },
   listenForShortcutEventsMock: vi.fn(),
 }));
@@ -31,7 +36,15 @@ describe("App", () => {
     desktopApiMock.setAlwaysOnTop.mockResolvedValue(undefined);
     desktopApiMock.setWindowOpacity.mockResolvedValue(undefined);
     desktopApiMock.toggleMainWindow.mockResolvedValue(undefined);
+    desktopApiMock.openSettingsWindow.mockResolvedValue(undefined);
+    desktopApiMock.closeSettingsWindow.mockResolvedValue(undefined);
     desktopApiMock.registerGlobalShortcuts.mockResolvedValue(undefined);
+    desktopApiMock.getCurrentWindowKind.mockResolvedValue("main");
+    desktopApiMock.getAppInfo.mockResolvedValue({
+      version: "0.1.0",
+      dataDir: "D:/FloatFlow/state",
+    });
+    desktopApiMock.listenForAppStateEvents.mockResolvedValue(() => undefined);
     listenForShortcutEventsMock.mockResolvedValue(() => undefined);
     resetAppStore();
     vi.clearAllMocks();

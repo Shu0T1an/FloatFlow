@@ -9,11 +9,20 @@ vi.mock("@/desktop/api", () => ({
     setAlwaysOnTop: vi.fn(),
     setWindowOpacity: vi.fn(),
     toggleMainWindow: vi.fn(),
+    openSettingsWindow: vi.fn().mockResolvedValue(undefined),
+    closeSettingsWindow: vi.fn().mockResolvedValue(undefined),
     registerGlobalShortcuts: vi.fn(),
+    getCurrentWindowKind: vi.fn().mockResolvedValue("main"),
+    getAppInfo: vi.fn().mockResolvedValue({
+      version: "0.1.0",
+      dataDir: "D:/FloatFlow/state",
+    }),
+    listenForAppStateEvents: vi.fn().mockResolvedValue(() => undefined),
   },
 }));
 
 import { StatusFooter } from "@/app/StatusFooter";
+import { desktopApi } from "@/desktop/api";
 import { appStore, resetAppStore } from "@/store/app-store";
 
 describe("StatusFooter", () => {
@@ -30,15 +39,13 @@ describe("StatusFooter", () => {
     expect(screen.getByText("便笺")).toBeInTheDocument();
   });
 
-  it("opens settings with shortcut and window behavior guidance", () => {
+  it("keeps only the settings entry in the footer", () => {
     render(<StatusFooter />);
+
+    expect(screen.queryByRole("button", { name: "数据导出" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "系统设置" }));
 
-    expect(screen.getByText("快捷键")).toBeInTheDocument();
-    expect(screen.getByText("Alt+Space")).toBeInTheDocument();
-    expect(screen.getByText("显示时自动回到右下角")).toBeInTheDocument();
-    expect(screen.getByText("100% 为实色，低于 100% 为玻璃态")).toBeInTheDocument();
-    expect(screen.getByText("当前版本位置固定，拖动将在后续版本支持")).toBeInTheDocument();
+    expect(desktopApi.openSettingsWindow).toHaveBeenCalledTimes(1);
   });
 });

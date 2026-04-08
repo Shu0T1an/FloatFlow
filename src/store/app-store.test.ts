@@ -8,7 +8,12 @@ const { desktopApiMock } = vi.hoisted(() => ({
     setAlwaysOnTop: vi.fn(),
     setWindowOpacity: vi.fn(),
     toggleMainWindow: vi.fn(),
+    openSettingsWindow: vi.fn(),
+    closeSettingsWindow: vi.fn(),
     registerGlobalShortcuts: vi.fn(),
+    getCurrentWindowKind: vi.fn(),
+    getAppInfo: vi.fn(),
+    listenForAppStateEvents: vi.fn(),
   },
 }));
 
@@ -28,7 +33,15 @@ describe("appStore", () => {
     desktopApiMock.setAlwaysOnTop.mockResolvedValue(undefined);
     desktopApiMock.setWindowOpacity.mockResolvedValue(undefined);
     desktopApiMock.toggleMainWindow.mockResolvedValue(undefined);
+    desktopApiMock.openSettingsWindow.mockResolvedValue(undefined);
+    desktopApiMock.closeSettingsWindow.mockResolvedValue(undefined);
     desktopApiMock.registerGlobalShortcuts.mockResolvedValue(undefined);
+    desktopApiMock.getCurrentWindowKind.mockResolvedValue("main");
+    desktopApiMock.getAppInfo.mockResolvedValue({
+      version: "0.1.0",
+      dataDir: "D:/FloatFlow/state",
+    });
+    desktopApiMock.listenForAppStateEvents.mockResolvedValue(() => undefined);
     resetAppStore();
     vi.clearAllMocks();
   });
@@ -96,5 +109,37 @@ describe("appStore", () => {
     await vi.runOnlyPendingTimersAsync();
 
     expect(desktopApiMock.saveAppState).not.toHaveBeenCalled();
+  });
+
+  it("replaces persisted state without overwriting local filters", () => {
+    appStore.setState({
+      todoFilter: "react",
+      memoFilter: "灵感",
+      isSearchOpen: true,
+    });
+
+    appStore.getState().replacePersistedState({
+      ...createDefaultState(),
+      preferences: {
+        ...createDefaultState().preferences,
+        theme: "dark",
+      },
+      todos: [
+        {
+          id: "todo-1",
+          title: "同步过来的任务",
+          completed: false,
+          priority: "medium",
+          createdAt: "2026-04-07T00:00:00.000Z",
+          updatedAt: "2026-04-07T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(appStore.getState().preferences.theme).toBe("dark");
+    expect(appStore.getState().todos).toHaveLength(1);
+    expect(appStore.getState().todoFilter).toBe("react");
+    expect(appStore.getState().memoFilter).toBe("灵感");
+    expect(appStore.getState().isSearchOpen).toBe(true);
   });
 });

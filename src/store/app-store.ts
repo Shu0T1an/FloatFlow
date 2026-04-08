@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
-import { desktopApi, type DesktopApi } from "@/desktop/api";
+import { desktopApi, type DesktopApi, type DesktopAppInfo, type WindowKind } from "@/desktop/api";
 import {
   clampOpacity,
   createDefaultState,
@@ -14,6 +14,7 @@ import {
   type AppState,
   type MemoNote,
 } from "@/shared/domain/app-state";
+import { debugError, debugLog } from "@/shared/lib/debug-log";
 import { extractTags } from "@/shared/lib/tags";
 
 type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
@@ -21,6 +22,7 @@ type MemoView = "list" | "editor";
 
 interface UiState {
   mode: AppMode;
+  windowKind: WindowKind;
   isHydrated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -32,11 +34,15 @@ interface UiState {
   isSearchOpen: boolean;
   focusTodoInputNonce: number;
   focusMemoEditorNonce: number;
+  appInfo: DesktopAppInfo | null;
 }
 
 export interface AppStoreState extends AppState, UiState {
   hydrate: () => Promise<void>;
   setMode: (mode: AppMode) => void;
+  openSettingsWindow: () => Promise<void>;
+  closeSettingsWindow: () => Promise<void>;
+  replacePersistedState: (state: AppState) => void;
   toggleSearch: () => void;
   closeSearch: () => void;
   setTodoFilter: (text: string) => void;
@@ -60,6 +66,7 @@ export interface AppStoreState extends AppState, UiState {
 
 const initialUiState: UiState = {
   mode: "todo",
+  windowKind: "main",
   isHydrated: false,
   isLoading: true,
   error: null,
@@ -71,12 +78,22 @@ const initialUiState: UiState = {
   isSearchOpen: false,
   focusTodoInputNonce: 0,
   focusMemoEditorNonce: 0,
+  appInfo: null,
 };
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function createAppStore(api: DesktopApi = desktopApi) {
   let storeRef: StoreApi<AppStoreState>;
+
+  const resolveWindowContext = async () => {
+    const [appInfo, windowKind] = await Promise.all([
+      api.getAppInfo().catch(() => null),
+      api.getCurrentWindowKind().catch(() => "main" as const),
+    ]);
+
+    return { appInfo, windowKind };
+  };
 
   const persistNow = async () => {
     const snapshot = selectPersistableState(storeRef.getState());
@@ -116,36 +133,55 @@ export function createAppStore(api: DesktopApi = desktopApi) {
     ...initialUiState,
     mode: createDefaultState().preferences.defaultMode,
     async hydrate() {
+      debugLog("app-store", "hydrate start");
       set({ isLoading: true, error: null });
 
       try {
         const loaded = normalizeAppState(await api.loadAppState());
+        const { appInfo, windowKind } = await resolveWindowContext();
+        debugLog("app-store", "hydrate resolved context", {
+          windowKind,
+          hasAppInfo: Boolean(appInfo),
+          todos: loaded.todos.length,
+          memos: loaded.memos.length,
+          theme: loaded.preferences.theme,
+        });
         set({
           ...loaded,
+          ...initialUiState,
+          appInfo,
+          windowKind,
           mode: loaded.preferences.defaultMode,
           isHydrated: true,
           isLoading: false,
-          saveStatus: "idle",
-          memoView: "list",
-          activeMemoId: null,
-          memoFilter: "",
-          todoFilter: "",
-          isSearchOpen: false,
         });
-        await api.setAlwaysOnTop(loaded.preferences.alwaysOnTop);
-        await api.setWindowOpacity(loaded.preferences.windowOpacity);
-        await api.registerGlobalShortcuts(loaded.preferences.hotkeys);
+        if (windowKind === "main") {
+          debugLog("app-store", "hydrate applying main-window desktop effects", {
+            alwaysOnTop: loaded.preferences.alwaysOnTop,
+            windowOpacity: loaded.preferences.windowOpacity,
+            hotkeys: loaded.preferences.hotkeys,
+          });
+          await api.setAlwaysOnTop(loaded.preferences.alwaysOnTop);
+          await api.setWindowOpacity(loaded.preferences.windowOpacity);
+          await api.registerGlobalShortcuts(loaded.preferences.hotkeys);
+        }
+        debugLog("app-store", "hydrate success", { windowKind });
       } catch (error) {
+        debugError("app-store", "hydrate failed", error);
         const fallback = createDefaultState();
+        const { appInfo, windowKind } = await resolveWindowContext();
         set({
           ...fallback,
           ...initialUiState,
+          appInfo,
+          windowKind,
           mode: fallback.preferences.defaultMode,
           isHydrated: true,
           isLoading: false,
           saveStatus: "error",
           error: toErrorMessage(error),
         });
+        debugLog("app-store", "hydrate fallback applied", { windowKind });
       }
     },
     setMode(mode) {
@@ -158,6 +194,28 @@ export function createAppStore(api: DesktopApi = desktopApi) {
         },
       }));
       schedulePersist();
+    },
+    async openSettingsWindow() {
+      debugLog("app-store", "openSettingsWindow action");
+      await api.openSettingsWindow();
+    },
+    async closeSettingsWindow() {
+      debugLog("app-store", "closeSettingsWindow action");
+      await api.closeSettingsWindow();
+    },
+    replacePersistedState(nextState) {
+      const normalized = normalizeAppState(nextState);
+      debugLog("app-store", "replacePersistedState", {
+        todos: normalized.todos.length,
+        memos: normalized.memos.length,
+        theme: normalized.preferences.theme,
+      });
+      set((state) => ({
+        todos: normalized.todos,
+        memos: normalized.memos,
+        preferences: normalized.preferences,
+        error: state.error,
+      }));
     },
     toggleSearch() {
       set((state) => ({

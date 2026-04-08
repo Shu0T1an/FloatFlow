@@ -1,16 +1,28 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/desktop/api", () => ({
-  desktopApi: {
+const { desktopApiMock } = vi.hoisted(() => ({
+  desktopApiMock: {
     loadAppState: vi.fn(),
     saveAppState: vi.fn().mockResolvedValue(undefined),
-    exportAppState: vi.fn(),
+    exportAppState: vi.fn().mockResolvedValue(undefined),
     setAlwaysOnTop: vi.fn().mockResolvedValue(undefined),
     setWindowOpacity: vi.fn().mockResolvedValue(undefined),
     toggleMainWindow: vi.fn(),
+    openSettingsWindow: vi.fn().mockResolvedValue(undefined),
+    closeSettingsWindow: vi.fn().mockResolvedValue(undefined),
     registerGlobalShortcuts: vi.fn(),
+    getCurrentWindowKind: vi.fn().mockResolvedValue("main"),
+    getAppInfo: vi.fn().mockResolvedValue({
+      version: "0.1.0",
+      dataDir: "D:/FloatFlow/state",
+    }),
+    listenForAppStateEvents: vi.fn().mockResolvedValue(() => undefined),
   },
+}));
+
+vi.mock("@/desktop/api", () => ({
+  desktopApi: desktopApiMock,
 }));
 
 import { WindowShell } from "@/app/WindowShell";
@@ -19,6 +31,7 @@ import { appStore, resetAppStore } from "@/store/app-store";
 describe("WindowShell", () => {
   beforeEach(() => {
     resetAppStore();
+    desktopApiMock.exportAppState.mockClear();
   });
 
   it("marks the shell as solid when opacity is 100%", () => {
@@ -52,5 +65,14 @@ describe("WindowShell", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "固定到桌面" })).toBeInTheDocument();
     });
+  });
+
+  it("opens the standalone settings window from the footer", () => {
+    render(<WindowShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "系统设置" }));
+
+    expect(desktopApiMock.openSettingsWindow).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("heading", { name: "系统设置" })).not.toBeInTheDocument();
   });
 });

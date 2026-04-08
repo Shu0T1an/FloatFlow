@@ -93,13 +93,13 @@ export function WindowShell() {
             </div>
             <p className="mt-2 text-[11px] ff-muted">100% 为实色，低于 100% 为玻璃态</p>
           </section>
-
-          {error ? (
-            <div className="rounded-[18px] border border-[rgba(220,190,155,0.46)] bg-[rgba(245,234,220,0.68)] px-4 py-3 text-sm text-[var(--ff-gold)]">
-              {error}
-            </div>
-          ) : null}
         </div>
+
+        {error ? (
+          <div className="mt-4 rounded-[18px] border border-[rgba(220,190,155,0.46)] bg-[rgba(245,234,220,0.68)] px-4 py-3 text-sm text-[var(--ff-gold)]">
+            {error}
+          </div>
+        ) : null}
 
         <div className="mt-4 flex-1 overflow-hidden">
           <div className="ff-scroll h-full overflow-y-auto pr-1">

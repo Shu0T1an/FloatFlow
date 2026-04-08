@@ -9,7 +9,12 @@ vi.mock("@/desktop/api", () => ({
     setAlwaysOnTop: vi.fn(),
     setWindowOpacity: vi.fn(),
     toggleMainWindow: vi.fn(),
+    openSettingsWindow: vi.fn(),
+    closeSettingsWindow: vi.fn(),
     registerGlobalShortcuts: vi.fn(),
+    getCurrentWindowKind: vi.fn(),
+    getAppInfo: vi.fn(),
+    listenForAppStateEvents: vi.fn(),
   },
 }));
 
